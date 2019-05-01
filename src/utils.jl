@@ -373,35 +373,11 @@ function heatmap_edges(v::AVec, scale::Symbol = :identity)
   map(invf, _heatmap_edges(map(f,v)))
 end
 
-function calc_r_extrema(x, y)
-    xmin, xmax = ignorenan_extrema(x)
-    ymin, ymax = ignorenan_extrema(y)
-    r = 0.5 * NaNMath.min(xmax - xmin, ymax - ymin)
-    ignorenan_extrema(r)
-end
-
-function convert_to_polar(x, y, r_extrema = calc_r_extrema(x, y))
+function convert_to_polar(theta, r, r_extrema = ignorenan_extrema(r))
     rmin, rmax = r_extrema
-    theta, r = filter_radial_data(x, y, r_extrema)
     r = (r .- rmin) ./ (rmax .- rmin)
     x = r.*cos.(theta)
     y = r.*sin.(theta)
-    x, y
-end
-
-# Filters radial data for points within the axis limits
-function filter_radial_data(theta, r, r_extrema::Tuple{Real, Real})
-    n = max(length(theta), length(r))
-    rmin, rmax = r_extrema
-    x, y = zeros(n), zeros(n)
-    for i in 1:n
-        x[i] = _cycle(theta, i)
-        y[i] = _cycle(r, i)
-    end
-    points = map((a, b) -> (a, b), x, y)
-    filter!(a -> a[2] >= rmin && a[2] <= rmax, points)
-    x = map(a -> a[1], points)
-    y = map(a -> a[2], points)
     x, y
 end
 
@@ -814,24 +790,24 @@ function debugplots(on = true)
   _debugMode.on = on
 end
 
-debugshow(x) = show(x)
-debugshow(x::AbstractArray) = print(summary(x))
+debugshow(io, x) = show(io, x)
+debugshow(io, x::AbstractArray) = print(io, summary(x))
 
-function dumpdict(plotattributes::KW, prefix = "", alwaysshow = false)
+function dumpdict(io::IO, plotattributes::KW, prefix = "", alwaysshow = false)
   _debugMode.on || alwaysshow || return
-  println()
+  println(io)
   if prefix != ""
-    println(prefix, ":")
+    println(io, prefix, ":")
   end
   for k in sort(collect(keys(plotattributes)))
     @printf("%14s: ", k)
-    debugshow(plotattributes[k])
-    println()
+    debugshow(io, plotattributes[k])
+    println(io)
   end
-  println()
+  println(io)
 end
-DD(plotattributes::KW, prefix = "") = dumpdict(plotattributes, prefix, true)
-
+DD(io::IO, plotattributes::KW, prefix = "") = dumpdict(io, plotattributes, prefix, true)
+DD(plotattributes::KW, prefix = "") = DD(stdout, plotattributes, prefix)
 
 function dumpcallstack()
   error()  # well... you wanted the stacktrace, didn't you?!?
