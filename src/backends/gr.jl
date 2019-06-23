@@ -84,12 +84,23 @@ gr_set_transparency(c, α) = gr_set_transparency(α)
 gr_set_transparency(c::Colorant, ::Nothing) = gr_set_transparency(c)
 gr_set_transparency(c::Colorant) = GR.settransparency(alpha(c))
 
+const _gr_arrow_map = Dict(
+    :simple => 1,
+    :hollow => 3,
+    :filled => 4,
+    :triangle => 5,
+    :filledtriangle => 6,
+    :closed => 6,
+    :open => 5,
+)
+gr_set_arrowstyle(s::Symbol) = GR.setarrowstyle(get(_gr_arrow_map, s, 1))
+
 # --------------------------------------------------------------------------------------
 
 
 # draw line segments, splitting x/y into contiguous/finite segments
 # note: this can be used for shapes by passing func `GR.fillarea`
-function gr_polyline(x, y, func = GR.polyline; arrowside=:none)
+function gr_polyline(x, y, func = GR.polyline; arrowside = :none, arrowstyle = :simple)
     iend = 0
     n = length(x)
     while iend < n-1
@@ -118,9 +129,11 @@ function gr_polyline(x, y, func = GR.polyline; arrowside=:none)
         if istart > 0 && iend > 0
             func(x[istart:iend], y[istart:iend])
             if arrowside in (:head,:both)
+                gr_set_arrowstyle(arrowstyle)
                 GR.drawarrow(x[iend-1], y[iend-1], x[iend], y[iend])
             end
             if arrowside in (:tail,:both)
+                gr_set_arrowstyle(arrowstyle)
                 GR.drawarrow(x[istart+1], y[istart+1], x[istart], y[istart])
             end
         else
@@ -162,7 +175,7 @@ function gr_polaraxes(rmin::Real, rmax::Real, sp::Subplot)
     a = α .+ 90
     sinf = sind.(a)
     cosf = cosd.(a)
-    rtick_values, rtick_labels = get_ticks(yaxis)
+    rtick_values, rtick_labels = get_ticks(sp, yaxis)
     if yaxis[:formatter] in (:scientific, :auto) && yaxis[:ticks] in (:auto, :native)
         rtick_labels = convert_sci_unicode.(rtick_labels)
     end
@@ -218,16 +231,16 @@ end
 
 
 # using the axis extrema and limit overrides, return the min/max value for this axis
-gr_x_axislims(sp::Subplot) = axis_limits(sp[:xaxis])
-gr_y_axislims(sp::Subplot) = axis_limits(sp[:yaxis])
-gr_z_axislims(sp::Subplot) = axis_limits(sp[:zaxis])
+gr_x_axislims(sp::Subplot) = axis_limits(sp, :x)
+gr_y_axislims(sp::Subplot) = axis_limits(sp, :y)
+gr_z_axislims(sp::Subplot) = axis_limits(sp, :z)
 gr_xy_axislims(sp::Subplot) = gr_x_axislims(sp)..., gr_y_axislims(sp)...
 
-function gr_lims(axis::Axis, adjust::Bool, expand = nothing)
+function gr_lims(sp::Subplot, axis::Axis, adjust::Bool, expand = nothing)
     if expand != nothing
         expand_extrema!(axis, expand)
     end
-    lims = axis_limits(axis)
+    lims = axis_limits(sp, axis[:letter])
     if adjust
         GR.adjustrange(lims...)
     else
@@ -989,7 +1002,7 @@ function gr_display(sp::Subplot{GRBackend}, w, h, viewport_canvas)
     if is3d(sp)
         # TODO do we really need a different clims computation here from the one
         #      computed above using get_clims(sp)?
-        zmin, zmax = gr_lims(zaxis, true)
+        zmin, zmax = gr_lims(sp, zaxis, true)
         clims3d = sp[:clims]
         if is_2tuple(clims3d)
             isfinite(clims3d[1]) && (zmin = clims3d[1])
@@ -1024,7 +1037,7 @@ function gr_display(sp::Subplot{GRBackend}, w, h, viewport_canvas)
     elseif ispolar(sp)
         r = gr_set_viewport_polar()
         #rmin, rmax = GR.adjustrange(ignorenan_minimum(r), ignorenan_maximum(r))
-        rmin, rmax = axis_limits(sp[:yaxis])
+        rmin, rmax = axis_limits(sp, :y)
         gr_polaraxes(rmin, rmax, sp)
 
     elseif draw_axes
@@ -1269,7 +1282,9 @@ function gr_display(sp::Subplot{GRBackend}, w, h, viewport_canvas)
                         gr_set_line(get_linewidth(series, i), get_linestyle(series, i), lc) #, series[:linealpha])
                         gr_set_transparency(lc, get_linealpha(series, i))
                         arrowside = isa(series[:arrow], Arrow) ? series[:arrow].side : :none
-                        gr_polyline(x[rng], y[rng]; arrowside = arrowside)
+                        arrowstyle = isa(series[:arrow], Arrow) ? series[:arrow].style : :simple
+                        gr_set_fillcolor(lc)
+                        gr_polyline(x[rng], y[rng]; arrowside = arrowside, arrowstyle = arrowstyle)
                     end
                 end
             end

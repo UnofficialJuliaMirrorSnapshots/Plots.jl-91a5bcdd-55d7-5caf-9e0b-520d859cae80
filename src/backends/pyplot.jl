@@ -862,9 +862,9 @@ end
 
 # --------------------------------------------------------------------------
 
-function py_set_lims(ax, axis::Axis)
+function py_set_lims(ax, sp::Subplot, axis::Axis)
     letter = axis[:letter]
-    lfrom, lto = axis_limits(axis)
+    lfrom, lto = axis_limits(sp, letter)
     getproperty(ax, Symbol("set_", letter, "lim"))(lfrom, lto)
 end
 
@@ -891,7 +891,7 @@ function py_set_ticks(ax, ticks, letter)
     end
 end
 
-function py_compute_axis_minval(axis::Axis)
+function py_compute_axis_minval(sp::Subplot, axis::Axis)
     # compute the smallest absolute value for the log scale's linear threshold
     minval = 1.0
     sps = axis.sps
@@ -905,13 +905,13 @@ function py_compute_axis_minval(axis::Axis)
     end
 
     # now if the axis limits go to a smaller abs value, use that instead
-    vmin, vmax = axis_limits(axis)
+    vmin, vmax = axis_limits(sp, axis[:letter])
     minval = NaNMath.min(minval, abs(vmin), abs(vmax))
 
     minval
 end
 
-function py_set_scale(ax, axis::Axis)
+function py_set_scale(ax, sp::Subplot, axis::Axis)
     scale = axis[:scale]
     letter = axis[:letter]
     scale in supported_scales() || return @warn("Unhandled scale value in pyplot: $scale")
@@ -927,7 +927,7 @@ function py_set_scale(ax, axis::Axis)
         elseif scale == :log10
             10
         end
-        kw[Symbol(:linthresh,letter)] = NaNMath.min(1e-16, py_compute_axis_minval(axis))
+        kw[Symbol(:linthresh,letter)] = NaNMath.min(1e-16, py_compute_axis_minval(sp, axis))
         "symlog"
     end
     func(arg; kw...)
@@ -1092,12 +1092,12 @@ function _before_layout_calcs(plt::Plot{PyPlotBackend})
             if axis[:guide_position] != :auto && letter != :z
                 pyaxis."set_label_position"(axis[:guide_position])
             end
-            py_set_scale(ax, axis)
-            axis[:ticks] != :native ? py_set_lims(ax, axis) : nothing
+            py_set_scale(ax, sp, axis)
+            axis[:ticks] != :native ? py_set_lims(ax, sp, axis) : nothing
             if ispolar(sp) && letter == :y
                 ax."set_rlabel_position"(90)
             end
-            ticks = sp[:framestyle] == :none ? nothing : get_ticks(axis)
+            ticks = sp[:framestyle] == :none ? nothing : get_ticks(sp, axis)
             # don't show the 0 tick label for the origin framestyle
             if sp[:framestyle] == :origin && length(ticks) > 1
                 ticks[2][ticks[1] .== 0] .= ""
@@ -1132,11 +1132,12 @@ function _before_layout_calcs(plt::Plot{PyPlotBackend})
         # showaxis
         if !sp[:xaxis][:showaxis]
             kw = KW()
+            if ispolar(sp)
+                ax.spines["polar"].set_visible(false)
+            end
             for dir in (:top, :bottom)
-                if ispolar(sp)
-                    ax."spines"."polar"."set_visible"(false)
-                else
-                    getproperty(ax.spines, dir).set_visible(false)
+                if !ispolar(sp)
+                    ax.spines[string(dir)].set_visible(false)
                 end
                 kw[dir] = kw[Symbol(:label,dir)] = false
             end
@@ -1146,7 +1147,7 @@ function _before_layout_calcs(plt::Plot{PyPlotBackend})
             kw = KW()
             for dir in (:left, :right)
                 if !ispolar(sp)
-                    getproperty(ax.spines, dir).set_visible(false)
+                    ax.spines[string(dir)].set_visible(false)
                 end
                 kw[dir] = kw[Symbol(:label,dir)] = false
             end

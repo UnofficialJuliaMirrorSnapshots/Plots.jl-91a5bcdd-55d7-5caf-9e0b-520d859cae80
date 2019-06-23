@@ -75,8 +75,8 @@ end
 text_size(lab::AbstractString, sz::Number, rot::Number = 0) = text_size(length(lab), sz, rot)
 
 # account for the size/length/rotation of tick labels
-function tick_padding(axis::Axis)
-    ticks = get_ticks(axis)
+function tick_padding(sp::Subplot, axis::Axis)
+    ticks = get_ticks(sp, axis)
     if ticks == nothing
         0mm
     else
@@ -106,10 +106,10 @@ end
 # to fit ticks, tick labels, guides, colorbars, etc.
 function _update_min_padding!(sp::Subplot)
     # TODO: something different when `is3d(sp) == true`
-    leftpad   = tick_padding(sp[:yaxis]) + sp[:left_margin]   + guide_padding(sp[:yaxis])
+    leftpad   = tick_padding(sp, sp[:yaxis]) + sp[:left_margin]   + guide_padding(sp[:yaxis])
     toppad    = sp[:top_margin]    + title_padding(sp)
     rightpad  = sp[:right_margin]
-    bottompad = tick_padding(sp[:xaxis]) + sp[:bottom_margin] + guide_padding(sp[:xaxis])
+    bottompad = tick_padding(sp, sp[:xaxis]) + sp[:bottom_margin] + guide_padding(sp[:xaxis])
 
     # switch them?
     if sp[:xaxis][:mirror]
@@ -143,12 +143,7 @@ function _pick_default_backend()
     if env_default != ""
         sym = Symbol(lowercase(env_default))
         if sym in _backends
-            if sym in _initialized_backends
-                backend(sym)
-            else
-                @warn("You have set `PLOTS_DEFAULT_BACKEND=$env_default` but `$(backend_package_name(sym))` is not loaded.")
-                _fallback_default_backend()
-            end
+            backend(sym)
         else
             @warn("You have set PLOTS_DEFAULT_BACKEND=$env_default but it is not a valid backend package.  Choose from:\n\t" *
                  join(sort(_backends), "\n\t"))
