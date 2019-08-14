@@ -347,7 +347,7 @@ function plotly_layout(plt::Plot)
 end
 
 function plotly_layout_json(plt::Plot)
-    JSON.json(plotly_layout(plt))
+    JSON.json(plotly_layout(plt), 4)
 end
 
 
@@ -631,11 +631,9 @@ function plotly_series_segments(series::Series, plotattributes_base::KW, x, y, z
         (isa(series[:fillrange], AbstractVector) || isa(series[:fillrange], Tuple))
 
     segments = iter_segments(series)
-    plotattributes_outs = Vector{KW}(undef, (hasfillrange ? 2 : 1 ) * length(segments))
+    plotattributes_outs = fill(KW(), (hasfillrange ? 2 : 1 ) * length(segments))
 
     for (i,rng) in enumerate(segments)
-        !isscatter && length(rng) < 2 && continue
-
         plotattributes_out = deepcopy(plotattributes_base)
         plotattributes_out[:showlegend] = i==1 ? should_add_to_legend(series) : false
         plotattributes_out[:legendgroup] = series[:label]
@@ -800,13 +798,16 @@ function plotly_series(plt::Plot)
 end
 
 # get json string for a list of dictionaries, each representing the series params
-plotly_series_json(plt::Plot) = JSON.json(plotly_series(plt))
+plotly_series_json(plt::Plot) = JSON.json(plotly_series(plt), 4)
 
 # ----------------------------------------------------------------
 
+html_head(plt::Plot{PlotlyBackend}) = plotly_html_head(plt)
+html_body(plt::Plot{PlotlyBackend}) = plotly_html_body(plt)
+
 const ijulia_initialized = Ref(false)
 
-function html_head(plt::Plot{PlotlyBackend})
+function plotly_html_head(plt::Plot)
     local_file = ("file://" * plotly_local_file_path)
     plotly = use_local_dependencies[] ? local_file : plotly_remote_file_path
     if isijulia() && !ijulia_initialized[]
@@ -822,12 +823,10 @@ function html_head(plt::Plot{PlotlyBackend})
         """)
         ijulia_initialized[] = true
     end
-    # IJulia just needs one initialization
-    isijulia() && return ""
     return "<script src=$(repr(plotly))></script>"
 end
 
-function html_body(plt::Plot{PlotlyBackend}, style = nothing)
+function plotly_html_body(plt, style = nothing)
     if style == nothing
         w, h = plt[:size]
         style = "width:$(w)px;height:$(h)px;"
@@ -843,23 +842,31 @@ function html_body(plt::Plot{PlotlyBackend}, style = nothing)
     html
 end
 
-function js_body(plt::Plot{PlotlyBackend}, uuid)
+function js_body(plt::Plot, uuid)
     js = """
         PLOT = document.getElementById('$(uuid)');
         Plotly.plot(PLOT, $(plotly_series_json(plt)), $(plotly_layout_json(plt)));
     """
 end
 
-
-# ----------------------------------------------------------------
-
-function _show(io::IO, ::MIME"application/vnd.plotly.v1+json", plot::Plot{PlotlyBackend})
+function plotly_show_js(io::IO, plot::Plot)
     data = []
     for series in plot.series_list
         append!(data, plotly_series(plot, series))
     end
     layout = plotly_layout(plot)
     JSON.print(io, Dict(:data => data, :layout => layout))
+end
+
+# ----------------------------------------------------------------
+
+function _show(io::IO, ::MIME"application/vnd.plotly.v1+json", plot::Plot{PlotlyBackend})
+    plotly_show_js(io, plot)
+end
+
+
+function _show(io::IO, ::MIME"text/html", plt::Plot{PlotlyBackend})
+    write(io, standalone_html(plt))
 end
 
 
