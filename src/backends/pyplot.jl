@@ -927,7 +927,7 @@ function py_set_scale(ax, sp::Subplot, axis::Axis)
         elseif scale == :log10
             10
         end
-        kw[Symbol(:linthresh,letter)] = NaNMath.min(1e-16, py_compute_axis_minval(sp, axis))
+        kw[Symbol(:linthresh,letter)] = NaNMath.max(1e-16, py_compute_axis_minval(sp, axis))
         "symlog"
     end
     func(arg; kw...)
@@ -1228,7 +1228,7 @@ end
 
 function py_add_annotations(sp::Subplot{PyPlotBackend}, x, y, val)
     ax = sp.o
-    ax."annotate"(val, xy = (x,y), zorder = 999)
+    ax."annotate"(val, xy = (x,y), zorder = 999, annotation_clip = false)
 end
 
 
@@ -1242,7 +1242,8 @@ function py_add_annotations(sp::Subplot{PyPlotBackend}, x, y, val::PlotText)
         verticalalignment = val.font.valign == :vcenter ? "center" : string(val.font.valign),
         rotation = val.font.rotation,
         size = py_thickness_scale(sp.plt, val.font.pointsize),
-        zorder = 999
+        zorder = 999,
+        annotation_clip = false
     )
 end
 
