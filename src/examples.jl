@@ -165,7 +165,7 @@ PlotExample("Marker types",
 ),
 
 PlotExample("Bar",
-    "x is the midpoint of the bar. (todo: allow passing of edges instead of midpoints)",
+    "`x` is the midpoint of the bar. (todo: allow passing of edges instead of midpoints)",
     [:(begin
         bar(randn(99))
     end)]
@@ -451,6 +451,32 @@ see: http://stackoverflow.com/a/37732384/5075246
     returns = sort!((1:N) + D*randn(N))
 
     portfoliocomposition(weights, returns, labels = permutedims(tickers))
+    end)]
+),
+
+PlotExample("Ribbons",
+    """
+    Ribbons can be added to lines via the `ribbon` keyword;
+    you can pass a tuple of arrays (upper and lower bounds),
+    a single Array (for symmetric ribbons), a Function, or a number.
+    """,
+    [:(begin
+        plot(
+            plot(0:10; ribbon = (LinRange(0, 2, 10), LinRange(0, 1, 10))),
+            plot(0:10; ribbon = 0:0.5:5),
+            plot(0:10; ribbon = sqrt),
+            plot(0:10; ribbon = 1),
+        )
+    end)]
+),
+
+PlotExample("Histogram2D (complex values)",
+    "",
+    [:(begin
+        n = 10_000
+        x = exp.(0.1randn(n) .+ randn(n).*(im))
+        histogram2d(x, nbins=(20,40), show_empty_bins=true,
+                    normed=true, aspect_ratio=1)
     end)]
 ),
 
