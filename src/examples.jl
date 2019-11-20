@@ -305,7 +305,8 @@ PlotExample("3D",
 
 PlotExample("DataFrames",
     "Plot using DataFrame column symbols.",
-    [:(begin
+    [:(using StatsPlots), # can't be inside begin block because @df gets expanded first
+     :(begin
         import RDatasets
         iris = RDatasets.dataset("datasets", "iris")
         @df iris scatter(:SepalLength, :SepalWidth, group=:Species,
@@ -354,7 +355,8 @@ PlotExample("Layouts, margins, label rotation, title location",
 
 PlotExample("Boxplot and Violin series recipes",
     "",
-    [:(begin
+    [:(using StatsPlots), # can't be inside begin block because @df gets expanded first
+     :(begin
         import RDatasets
         singers = RDatasets.dataset("lattice", "singer")
         @df singers violin(:VoicePart, :Height, line = 0, fill = (0.2, :blue))
@@ -480,6 +482,23 @@ PlotExample("Histogram2D (complex values)",
     end)]
 ),
 
+PlotExample("Unconnected lines using `missing` or `NaN`",
+"""
+Missing values and non-finite values, including `NaN`, are not plotted.
+Instead, lines are separated into segments at these values.
+""",
+    [:(begin
+        x,y = [1,2,2,1,1], [1,2,1,2,1]
+        plot(
+              plot([rand(5); NaN; rand(5); NaN; rand(5)]),
+              plot([1,missing,2,3], marker=true),
+              plot([x; NaN; x.+2], [y; NaN; y.+1], arrow=2),
+              plot([1, 2+3im, Inf, 4im, 3, -Inf*im, 0, 3+3im], marker=true),
+              legend=false
+        )
+    end)]
+),
+
 ]
 
 # Some constants for PlotDocs and PlotReferenceImages
@@ -501,7 +520,12 @@ function test_examples(pkgname::Symbol, idx::Int; debug = false, disp = true)
   @info("Testing plot: $pkgname:$idx:$(_examples[idx].header)")
   backend(pkgname)
   backend()
-  map(eval, _examples[idx].exprs)
+
+  # prevent leaking variables (esp. functions) directly into Plots namespace
+  m = Module(:PlotExampleModule)
+  Base.eval(m, :(using Plots))
+  map(exprs -> Base.eval(m, exprs), _examples[idx].exprs)
+
   plt = current()
   if disp
     gui(plt)
